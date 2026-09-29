@@ -1,0 +1,49 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: gitop_postgres
+    environment:
+      POSTGRES_USER: gitop
+      POSTGRES_PASSWORD: gitop
+      POSTGRES_DB: gitop
+    ports:
+      - "5432:5432"
+    volumes:
+      - gitop_postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U gitop"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  api:
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+    container_name: gitop_api
+    environment:
+      DATABASE_URL: postgres://gitop:gitop@postgres:5432/gitop
+      API_PORT: 8080
+    ports:
+      - "8080:8080"
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  gateway:
+    build:
+      context: .
+      dockerfile: gateway/Dockerfile
+    container_name: gitop_gateway
+    environment:
+      API_UPSTREAM: http://api:8080
+      DATABASE_URL: postgres://gitop:gitop@postgres:5432/gitop?sslmode=disable
+      GATEWAY_PORT: 8081
+      GATEWAY_ALLOW_ORIGIN: "*"
+    ports:
+      - "8081:8081"
+    depends_on:
+      - api
+
+volumes:
+  gitop_postgres_data:
